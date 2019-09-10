@@ -1,0 +1,63 @@
+CREATE database invoice;
+USE invoice;
+
+CREATE TABLE `invoiceheader` (
+`invoicenum` varchar(8) NOT NULL ,
+`invoicedate` date NOT NULL ,
+`invoiceamount` float(8) NOT NULL ,
+PRIMARY KEY (`invoicenum`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE `invoicedetail` (
+`invoicenum` varchar(8) NOT NULL ,
+`trackingno` varchar(18) NOT NULL ,
+`detailamount` float(8) NOT NULL ,
+PRIMARY KEY (`trackingno`), foreign key (invoicenum) references invoiceheader(invoicenum)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE `invoicecharges` (
+`invoicenum` varchar(8) NOT NULL ,
+`trackingno` varchar(18) NOT NULL ,
+`chargetype` varchar(3) NOT NULL ,
+`chargeamount` float(8) NOT NULL ,
+foreign key (invoicenum) references invoiceheader(invoicenum),
+foreign key (trackingno) references invoicedetail(trackingno)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+INSERT INTO `invoiceheader` VALUES ('00551198', '2014-01-01', 150.5);
+INSERT INTO `invoiceheader` VALUES ('00551199', '2014-01-02', 10);
+
+INSERT INTO `invoicedetail` VALUES ('00551198', '1Z2F12346861507266', 50);
+INSERT INTO `invoicedetail` VALUES ('00551198', '1Z2F12346861507267', 80);
+INSERT INTO `invoicedetail` VALUES ('00551198', '1Z2F12346861507268', 20.5);
+INSERT INTO `invoicedetail` VALUES ('00551199', '1Z2F12346861503423', 10.5);
+
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507266', 'FRT', 40);
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507266', 'FUE', 11);
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507267', 'FRT', 65);
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507267', 'FUE', 17);
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507268', 'FRT', 10);
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507268', 'FUE', 5);
+INSERT INTO `invoicecharges` VALUES ('00551198', '1Z2F12346861507268', 'HAZ', 5.5);
+INSERT INTO `invoicecharges` VALUES ('00551199', '1Z2F12346861503423', 'FRT', 8);
+INSERT INTO `invoicecharges` VALUES ('00551199', '1Z2F12346861503423', 'FUE', 2.5);
+
+select i.*, id.sumdetail, (i.invoiceamount-id.sumdetail) as discrepancy
+from invoiceheader as i left join
+     (select id.invoicenum, sum(detailamount) as sumdetail
+      from invoicedetail as id
+      group by id.invoicenum
+     ) id
+     on i.invoicenum = id.invoicenum
+where invoicedate between '2014-01-01' and '2014-01-02'
+having id.sumdetail <> i.invoicenum or id.sumdetail is null ;
+
+SELECT i.invoicenum, i.invoicedate, t.trackingno, t.sum1 as detailamount, t.sum2 as chargeamount,(t.sum1-t.sum2) as discrep 
+FROM invoiceheader i, 
+(SELECT d.invoicenum, d.trackingno, sum( d.detailamount ) AS sum1, c.sum2 
+  FROM invoicedetail d, 
+  (select invoicenum, trackingno,sum( chargeamount ) as sum2 from invoicecharges GROUP BY invoicenum, trackingno) c 
+ WHERE d.invoicenum = c.invoicenum 
+ AND d.trackingno = c.trackingno 
+ GROUP BY d.invoicenum, d.trackingno) t 
+ where invoicedate between 2014-01-01 and 2014-01-02 and i.invoicenum=t.invoicenum and (t.sum1-t.sum2) != 0 ; 
